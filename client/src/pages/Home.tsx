@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Download, Zap, Volume2, Info } from 'lucide-react';
+import { Download, Zap, Volume2, Info, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent } from '@/components/ui/card';
@@ -9,8 +9,10 @@ import { AudioPlayer } from '@/components/AudioPlayer';
 import { SpectrumVisualizer } from '@/components/SpectrumVisualizer';
 import { PresetSelector, PRESETS, type Preset } from '@/components/PresetSelector';
 import { YouTubeSearch } from '@/components/YouTubeSearch';
+import { DownloadDrawer } from '@/components/DownloadDrawer';
 
 import { useAudioProcessor } from '@/hooks/useAudioProcessor';
+import { useDownloadHistory } from '@/hooks/useDownloadHistory';
 import {
   Dialog,
   DialogContent,
@@ -50,6 +52,8 @@ export default function Home() {
     clearResult,
     downloadProcessed,
   } = useAudioProcessor();
+
+  const { addDownload } = useDownloadHistory();
 
   const handleFileSelect = useCallback((fileInfo: AudioFileInfo) => {
     setSelectedFile(fileInfo);
@@ -98,6 +102,55 @@ export default function Home() {
     });
   }, [selectedFile, sweepFreq, width, intensity, balance, processAudio]);
 
+  const handleDownload = useCallback(async () => {
+    const downloadInfo = downloadProcessed();
+    if (!downloadInfo) return;
+
+    const isCapacitor = (window as any).Capacitor !== undefined;
+
+    if (isCapacitor) {
+      // 1. Descarga Nativa con Capacitor Filesystem
+      try {
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+        
+        // Convertir Blob URL a base64
+        const response = await fetch(downloadInfo.blobUrl);
+        const blob = await response.blob();
+        const base64Data = await new Promise<string>((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+        
+        // Escribir el archivo en el directorio de descargas
+        await Filesystem.writeFile({
+          path: downloadInfo.fileName,
+          data: base64Data.split(',')[1], // Obtener solo la parte base64
+          directory: Directory.Downloads,
+          recursive: true,
+        });
+
+        // Opcional: Mostrar notificación de éxito (requiere plugin de notificaciones)
+        console.log('Descarga nativa exitosa:', downloadInfo.fileName);
+
+      } catch (e) {
+        console.error('Error en descarga nativa:', e);
+        alert('Error al guardar el archivo en el dispositivo. Intenta de nuevo.');
+        return;
+      }
+    } else {
+      // 2. Descarga Web (Fallback)
+      const link = document.createElement('a');
+      link.href = downloadInfo.blobUrl;
+      link.download = downloadInfo.fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    addDownload(downloadInfo.fileName);
+  }, [downloadProcessed, addDownload]);
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -116,7 +169,9 @@ export default function Home() {
             </div>
             
             <div className="flex items-center gap-2">
-
+              
+              {/* Botón Historial de Descargas (Download Drawer) */}
+              <DownloadDrawer />
               
               {/* Botón Acerca de */}
               <Dialog>
@@ -355,7 +410,7 @@ export default function Home() {
       </header>
 
       <main className="container py-8">
-        <div className="grid lg:grid-cols-[1fr,400px] gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr,400px] gap-8">
           {/* Main Panel */}
           <div className="space-y-6">
 
@@ -395,7 +450,7 @@ export default function Home() {
                   </div>
 
                   {/* Knobs */}
-                  <div className="flex flex-wrap justify-center gap-8 md:gap-12">
+                  <div className="flex flex-wrap justify-center gap-4 md:gap-12">
                     <Knob
                       value={sweepFreq}
                       min={27}
@@ -504,7 +559,7 @@ export default function Home() {
                       Resultado del Procesamiento
                     </h2>
                     <Button
-                      onClick={downloadProcessed}
+                      onClick={handleDownload}
                       className="bg-green-600 hover:bg-green-700"
                     >
                       <Download className="w-4 h-4 mr-2" />
@@ -523,7 +578,7 @@ export default function Home() {
 
                   {/* Spectrum Visualizers */}
                   {originalSpectrum && processedSpectrum && (
-                    <div className="grid md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
                         <h3 className="text-xs text-muted-foreground mb-2">Espectro Original</h3>
                         <SpectrumVisualizer data={originalSpectrum} />

@@ -34,7 +34,8 @@ export function YouTubeSearch({ onAudioDownloaded, disabled }: YouTubeSearchProp
       });
 
       if (!response.ok) {
-        throw new Error('Error al descargar la canción');
+        const errorData = await response.json().catch(() => ({ error: 'Error al descargar la canción' }));
+        throw new Error(errorData.details || errorData.error || 'Error al descargar la canción');
       }
 
       const blob = await response.blob();

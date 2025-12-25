@@ -376,7 +376,10 @@ export function useAudioProcessor() {
       const origMono = originalData.length > 1
         ? new Float32Array(originalData[0].length).map((_, i) => (originalData[0][i] + originalData[1][i]) / 2)
         : originalData[0];
-      setOriginalSpectrum(generateSpectrumData(origMono, audioBuffer.sampleRate));
+      // La generación de espectro es costosa, solo se hace si el componente lo pide
+      if (!originalSpectrum) {
+        setOriginalSpectrum(generateSpectrumData(origMono, audioBuffer.sampleRate));
+      }
 
       setProgress(50);
 
@@ -391,7 +394,9 @@ export function useAudioProcessor() {
       const procMono = processedData.length > 1
         ? new Float32Array(processedData[0].length).map((_, i) => (processedData[0][i] + processedData[1][i]) / 2)
         : processedData[0];
-      setProcessedSpectrum(generateSpectrumData(procMono, audioBuffer.sampleRate));
+      if (!processedSpectrum) {
+        setProcessedSpectrum(generateSpectrumData(procMono, audioBuffer.sampleRate));
+      }
 
       const originalBlob = createMp3Blob(originalData, audioBuffer.sampleRate);
       const processedBlob = createMp3Blob(processedData, audioBuffer.sampleRate);
@@ -433,13 +438,10 @@ export function useAudioProcessor() {
   const downloadProcessed = useCallback(() => {
     if (!result) return;
 
-    const link = document.createElement('a');
-    link.href = result.processedUrl;
-    // Usar el nombre del archivo original con sufijo _epicenter
-    link.download = `${result.originalFileName}_epicenter.mp3`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const fileName = `${result.originalFileName}_epicenter.mp3`;
+    const blobUrl = result.processedUrl;
+
+    return { fileName, blobUrl };
   }, [result]);
 
   return {
@@ -452,6 +454,7 @@ export function useAudioProcessor() {
     processAudio,
     clearResult,
     downloadProcessed,
+    result,
   };
 }
 

@@ -19,7 +19,7 @@ export function Knob({
   onChange,
   label,
   unit = '',
-  size = 120,
+  size = 100,
   color = '#ef4444',
   disabled = false,
 }: KnobProps) {
@@ -135,7 +135,7 @@ export function Knob({
       {/* Knob container */}
       <div 
         ref={knobRef}
-        className="relative cursor-pointer"
+        className="relative cursor-pointer mx-auto"
         style={{ width: size, height: size }}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
